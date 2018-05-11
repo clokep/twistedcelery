@@ -23,4 +23,4 @@ rabbitmqctl set_permissions -p / rabbitmq ".*" ".*" ".*"
 
 # Install Python and the necessary Python packages.
 apt-get install -y python python-pip
-pip install -r /vagrant/requirements.txt
+pip install --disable-pip-version-check -r /vagrant/requirements.txt
