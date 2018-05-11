@@ -1,0 +1,3 @@
+Twisted==18.4.0
+txAMQP==0.8.2
+celery==4.1.0
