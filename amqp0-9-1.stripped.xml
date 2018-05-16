@@ -316,19 +316,19 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
   <class name="basic" handler="channel" index="60">
     <chassis name="server" implement="MUST"/>
     <chassis name="client" implement="MAY"/>
-    <field name="content-type" domain="shortstr"/>
-    <field name="content-encoding" domain="shortstr"/>
+    <field name="content_type" domain="shortstr"/>
+    <field name="content_encoding" domain="shortstr"/>
     <field name="headers" domain="table"/>
-    <field name="delivery-mode" domain="octet"/>
+    <field name="delivery_mode" domain="octet"/>
     <field name="priority" domain="octet"/>
-    <field name="correlation-id" domain="shortstr"/>
-    <field name="reply-to" domain="shortstr"/>
+    <field name="correlation_id" domain="shortstr"/>
+    <field name="reply_to" domain="shortstr"/>
     <field name="expiration" domain="shortstr"/>
-    <field name="message-id" domain="shortstr"/>
+    <field name="message_id" domain="shortstr"/>
     <field name="timestamp" domain="timestamp"/>
     <field name="type" domain="shortstr"/>
-    <field name="user-id" domain="shortstr"/>
-    <field name="app-id" domain="shortstr"/>
+    <field name="user_id" domain="shortstr"/>
+    <field name="app_id" domain="shortstr"/>
     <field name="reserved" domain="shortstr"/>
     <method name="qos" synchronous="1" index="10">
       <chassis name="server" implement="MUST"/>
@@ -346,15 +346,15 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
       <field name="reserved-1" type="short" reserved="1"/>
       <field name="queue" domain="queue-name"/>
       <field name="consumer-tag" domain="consumer-tag"/>
-      <field name="no-local" domain="no-local"/>
-      <field name="no-ack" domain="no-ack"/>
+      <field name="no_local" domain="no-local"/>
+      <field name="no_ack" domain="no-ack"/>
       <field name="exclusive" domain="bit"/>
       <field name="no-wait" domain="no-wait"/>
       <field name="arguments" domain="table"/>
     </method>
     <method name="consume-ok" synchronous="1" index="21">
       <chassis name="client" implement="MUST"/>
-      <field name="consumer-tag" domain="consumer-tag"/>
+      <field name="consumer_tag" domain="consumer-tag"/>
     </method>
     <method name="cancel" synchronous="1" index="30">
       <chassis name="server" implement="MUST"/>
@@ -368,9 +368,9 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     </method>
     <method name="publish" content="1" index="40">
       <chassis name="server" implement="MUST"/>
-      <field name="reserved-1" type="short" reserved="1"/>
+      <field name="reserved_1" type="short" reserved="1"/>
       <field name="exchange" domain="exchange-name"/>
-      <field name="routing-key" domain="shortstr"/>
+      <field name="routing_key" domain="shortstr"/>
       <field name="mandatory" domain="bit"/>
       <field name="immediate" domain="bit"/>
     </method>
