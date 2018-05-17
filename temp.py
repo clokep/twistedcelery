@@ -49,7 +49,12 @@ LOGGING = {
             'handlers': ['normal'],
             'propagate': True,
             'level': 'DEBUG',
-        }
+        },
+        'txamqp': {
+            'handlers': ['normal'],
+            'propagate': True,
+            'level': 'DEBUG',
+        },
     },
 }
 
@@ -439,12 +444,36 @@ def main(reactor):
     tx_app = txCelery(app)
     tx_app.channel = channel
 
+    # Declare the result queue.
+    # See celery.backends.rpc.binding
+    yield channel.queue_declare(queue=app.backend.binding.name, durable=False, exclusive=False, auto_delete=True,
+                                # Convert to milliseconds.
+                                arguments={'x-expires': int(app.backend.binding.expires * 1000)})
+    # Do not declare exchanges or bindings on the default queue.
+    #yield channel.exchange_declare(exchange=app.backend.binding.exchange.name, type="direct", durable=True)
+
+    #yield channel.queue_bind(queue=app.backend.binding.name,
+    #                         exchange=app.backend.binding.exchange.name,
+    #                         routing_key=app.backend.binding.routing_key)
+
     # Send the message.
     print("Sending task")
-    result = tx_app.send_task('tasks.add', args=(42, 42424242))
-    print("Got result: %s" % result)
+    result = tx_app.send_task('tasks.add', args=(2, 4))
     result = yield result
     print("Wait for result: %s" % result)
+
+    # Consume from the results queue. The consumer tag is used to match
+    # responses back up with the proper (in-memory) queue, we only have one
+    # consumer on a results queue, so just re-use the queue name.
+    yield channel.basic_consume(queue=app.backend.binding.name, no_ack=True, consumer_tag=app.backend.binding.name)
+    queue = yield client.queue(app.backend.binding.name)
+
+    while True:
+        print("Getting result from ", queue)
+        msg = yield queue.get()
+        print('Received: {0} from channel #{1}'.format(msg.content.body, channel.id))
+        if msg.content.body == "STOP":
+            break
 
     # Wait a bit.
     yield task.deferLater(reactor, 10, later)
