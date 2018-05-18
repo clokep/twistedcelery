@@ -15,15 +15,26 @@ from kombu.serialization import dumps
 
 from twisted.internet import defer
 
-from txamqp.content import Content
+from twistedcelery.amqp import AmqpBackend
 
 
 class txCelery(object):
     def __init__(self, app):
+        # The Celery app.
         self.app = app
+        # The Celery AMQP object.
         self.amqp = app.amqp
+        # The Celery configuration.
         self.conf = app.conf
 
+        # The broker to send tasks to the backend to get results from.
+        self.channel = AmqpBackend(self)
+        self.backend = self.channel
+
+        # A mapping of task ID -> Deferred.
+        self._sent_tasks = {}
+
+    @defer.inlineCallbacks
     def send_task(self, name, args=None, kwargs=None, countdown=None,
                   eta=None, task_id=None, producer=None, connection=None,
                   router=None, result_cls=None, expires=None,
@@ -74,16 +85,40 @@ class txCelery(object):
         # if connection:
         #     producer = amqp.Producer(connection, auto_declare=False)
         # self.backend.on_task_call(P, task_id)
+
+        # with self.producer_or_acquire(producer) as P:
+        #     with P.connection._reraise_as_library_errors():
+        #         if not ignored_result:
+        #             self.backend.on_task_call(P, task_id)
+        #         amqp.send_task_message(P, name, message, **options)
+
+        yield self.channel.ensure_connected()
         self.send_task_message(name, message, **options)
 
+        result = defer.Deferred()
+        self._sent_tasks[task_id] = result
+
         # result = (result_cls or self.AsyncResult)(task_id)
-        result = defer.succeed(task_id)
         # if add_to_parent:
         #     if not have_parent:
         #         parent, have_parent = self.current_worker_task, True
         #     if parent:
         #         parent.add_trail(result)
-        return result
+        #  return result
+        result = yield result
+        defer.returnValue(result)
+
+    def got_result(self, payload):
+        result = self.app.backend.decode(payload)
+
+        # Try to find the Deferred to resolve.
+        try:
+            d = self._sent_tasks[result['task_id']]
+        except KeyError:
+            return
+
+        # TODO Handle failures.
+        d.callback(result['result'])
 
     def send_task_message(self, name, message,
                           exchange=None, routing_key=None, queue=None,
@@ -324,7 +359,7 @@ class txCelery(object):
                  immediate, exchange, declare):
         # Copied from kombu.messaging.Producer._publish.
         channel = self.channel
-        message = self.prepare_message(
+        message = channel.prepare_message(
             body, priority, content_type,
             content_encoding, headers, properties,
         )
@@ -336,22 +371,11 @@ class txCelery(object):
         reply_to = properties.get('reply_to')
         if isinstance(reply_to, Queue):
             properties['reply_to'] = reply_to.name
-        print(headers)
         return channel.basic_publish(
             content=message,
             exchange=exchange, routing_key=routing_key,
             mandatory=mandatory, immediate=immediate,
         )
 
-    def prepare_message(self, body, priority=0,
-                        content_type=None, content_encoding=None,
-                        headers=None, properties=None):
-        """Prepare message so that it can be sent using this transport."""
-        # Inspired by kombu.transport.pyamqp.Channel.prepare_message.
-        properties.update({
-            'priority': priority,
-            'content_type': content_type,
-            'content_encoding': content_encoding,
-            'headers': headers,
-        })
-        return Content(body, properties=properties)
+    def disconnect(self):
+        self.channel.disconnect()
