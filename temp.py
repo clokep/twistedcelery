@@ -33,7 +33,12 @@ LOGGING = {
             'propagate': True,
             'level': 'DEBUG',
         },
-        'txamqp': {
+        'twistedcelery': {
+            'handlers': ['normal'],
+            'propagate': True,
+            'level': 'DEBUG',
+        },
+        'pika': {
             'handlers': ['normal'],
             'propagate': True,
             'level': 'DEBUG',
@@ -52,14 +57,6 @@ observer.start()
 # END LOGGING
 
 
-@defer.inlineCallbacks
-def _main(reactor):
-    try:
-        yield main(reactor)
-    except Exception as e:
-        print(e)
-
-
 def later():
     print("LATER DUDE")
 
@@ -72,9 +69,9 @@ def main(reactor):
     # Send the message.
     print("Sending task")
     result = tx_app.send_task('tasks.add', args=(2, 4))
-    print(result)
+    print("Result", result)
     result = yield result
-    print("Wait for result: %s" % result)
+    print("Wait for result", result)
 
     # Wait a bit.
     yield task.deferLater(reactor, 10, later)
@@ -82,4 +79,4 @@ def main(reactor):
     tx_app.disconnect()
 
 
-task.react(_main)
+task.react(main)

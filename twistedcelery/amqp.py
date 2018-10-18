@@ -1,10 +1,11 @@
 import os
 
-from txamqp.content import Content
-from txamqp.endpoint import AMQEndpoint
-from txamqp.factory import AMQFactory
+import pika
+from pika import exceptions
+from pika.adapters.twisted_connection import TwistedProtocolConnection
 
 from twisted.internet import defer, reactor
+from twisted.internet.protocol import ClientCreator
 
 
 class AmqpBackend(object):
@@ -15,24 +16,24 @@ class AmqpBackend(object):
         # The Celery app.
         self.app = tx_app.app
 
-        # Configure the factory with broker information.
-        broker_url = self.app.conf.broker_url.replace(':5672', '')
-        self.endpoint = AMQEndpoint.from_uri(reactor, broker_url)
-        self.endpoint._auth_mechanism = 'PLAIN'
-        self.factory = AMQFactory(spec=os.path.join(os.path.dirname(__file__), "amqp0-9-1.stripped.xml"))
-
         self._connected = False
 
     @defer.inlineCallbacks
     def ensure_connected(self):
         """Ensure that the producer is connected (and the consumer is ready to receive results)."""
         if not self._connected:
+            # Initialize pika.
+            parameters = pika.connection.URLParameters(self.app.conf.broker_url)
+            if parameters.virtual_host == '':
+                parameters.virtual_host = '/'
+            creator = ClientCreator(reactor, TwistedProtocolConnection, parameters)
+
             # Connect to the broker.
-            self.client = yield self.endpoint.connect(self.factory)
+            protocol = yield creator.connectTCP(parameters.host, parameters.port)
+            yield protocol.ready
 
             # Ensure there's a channel open.
-            self.channel = yield self.client.channel(1)
-            yield self.channel.channel_open()
+            self.channel = yield protocol.channel(1)
 
             # Declare the result queue. See celery.backends.rpc.binding
             yield self.channel.queue_declare(
@@ -49,20 +50,21 @@ class AmqpBackend(object):
             # default queue.
 
             # Consume from the results queue. The consumer tag is used to match
-            # responses back up with the proper (in-memory) queue, we only have one
-            # consumer on a results queue, so just re-use the queue name.
-            yield self.channel.basic_consume(
+            # responses back up with the proper (in-memory) queue, we only have
+            # one consumer on a results queue, so just re-use the queue name.
+            queue, consumer_tag = yield self.channel.basic_consume(
                 queue=self.app.backend.binding.name,
                 no_ack=True,
                 consumer_tag=self.app.backend.binding.name)
-            queue = yield self.client.queue(self.app.backend.binding.name)
 
+            # TODO Continually read from this queue.
             queue.get().addCallback(self.got_result)
 
             self._connected = True
 
     def got_result(self, message):
-        self.tx_app.got_result(message.content.body)
+        channel, method, properties, body = message
+        self.tx_app.got_result(body)
 
     def prepare_message(self, body, priority=0,
                         content_type=None, content_encoding=None,
@@ -75,13 +77,21 @@ class AmqpBackend(object):
             'content_encoding': content_encoding,
             'headers': headers,
         })
-        return Content(body, properties=properties)
+        return body, properties
 
     def basic_publish(self, content, exchange, routing_key, mandatory, immediate):
+        body, properties = content
         # Pass publishing to the underlying implementation.
-        return self.channel.basic_publish(content=content, exchange=exchange, routing_key=routing_key, mandatory=mandatory, immediate=immediate)
+        return self.channel.basic_publish(
+            exchange=exchange,
+            routing_key=routing_key,
+            body=body,
+            properties=pika.spec.BasicProperties(**properties),
+            mandatory=mandatory,
+            immediate=immediate)
 
     def disconnect(self):
         if self._connected:
             # Disconnect politely.
-            self.client.transport.loseConnection()
+            #self.client.transport.loseConnection()
+            pass

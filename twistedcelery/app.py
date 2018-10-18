@@ -93,6 +93,7 @@ class txCelery(object):
         #         amqp.send_task_message(P, name, message, **options)
 
         yield self.channel.ensure_connected()
+        # TODO Handle deferred returned.
         self.send_task_message(name, message, **options)
 
         result = defer.Deferred()
