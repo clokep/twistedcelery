@@ -1,11 +1,14 @@
 import logging.config
 import sys
 
+from celery import Celery
+
 from twisted.internet import defer, task
+from twisted.python import log
 
 from twistedcelery import TwistedCelery
 
-from tasks import app
+app = Celery(broker='amqp://guest:guest@127.0.0.1:5672//', backend='rpc', include=['tests.tasks'])
 
 
 # SET UP LOGGING
@@ -49,8 +52,6 @@ LOGGING = {
 logging.config.dictConfig(LOGGING)
 
 
-from twisted.python import log
-
 observer = log.PythonLoggingObserver('temp.twisted')
 observer.start()
 
@@ -66,17 +67,17 @@ def main(reactor):
 
     # Send the message.
     print("Sending task(s)")
-    result = tx_app.send_task('tasks.add', args=(2, 4))
-    result2 = tx_app.send_task('tasks.add', args=(4, 4))
+    result = tx_app.send_task('tests.tasks.add', args=(2, 4))
+    result2 = tx_app.send_task('tests.tasks.add', args=(4, 4))
     result = yield result
     result2 = yield result2
     print("Got results: ", result, result2)
 
     yield task.deferLater(reactor, 3, lambda: True)
 
-    result = yield tx_app.send_task('tasks.div', args=(2, 2))
+    result = yield tx_app.send_task('tests.tasks.div', args=(2, 2))
     print("Got result: ", result)
-    result = yield tx_app.send_task('tasks.div', args=(2, 0))
+    result = yield tx_app.send_task('tests.tasks.div', args=(2, 0))
 
     tx_app.disconnect()
 
@@ -84,4 +85,5 @@ def main(reactor):
 #result = app.send_task('tasks.div', args=(2, 0))
 #result.get()
 
-task.react(main)
+if __name__ == '__main__':
+    task.react(main)
