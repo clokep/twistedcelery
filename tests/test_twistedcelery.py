@@ -5,7 +5,6 @@ import pytest
 
 import pytest_twisted
 
-from twistedcelery import TwistedCelery
 
 
 def test_config(celery_app):
@@ -16,19 +15,15 @@ def test_config(celery_app):
 
 
 @pytest_twisted.inlineCallbacks
-def test_success(celery_app):
+def test_success(twisted_app):
     """Test sending tasks via Twisted."""
-    tx_app = TwistedCelery(celery_app)
-
-    result = yield tx_app.send_task('tests.tasks.mul', args=(4, 4))
+    result = yield twisted_app.send_task('tests.tasks.mul', args=(4, 4))
 
     assert result == 16
 
 
 @pytest_twisted.inlineCallbacks
-def test_failure(celery_app):
-    """Test sending tasks via Twisted."""
-    tx_app = TwistedCelery(celery_app)
-
+def test_failure(twisted_app):
+    """Test sending tasks via Twisted that result in an error."""
     with pytest.raises(ZeroDivisionError):
-        yield tx_app.send_task('tests.tasks.div', args=(1, 0))
+        yield twisted_app.send_task('tests.tasks.div', args=(1, 0))
