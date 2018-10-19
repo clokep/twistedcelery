@@ -67,16 +67,16 @@ class AmqpBackend(object):
 
         # Continually read from this queue.
         def process_queue(result):
-            self.got_result(result)
+            self.process_result(result)
             queue.get().addCallback(process_queue)
         queue.get().addCallback(process_queue)
 
         self._connected = True
         self._connection_deferred.callback(True)
 
-    def got_result(self, message):
+    def process_result(self, message):
         channel, method, properties, body = message
-        self.tx_app.got_result(body)
+        self.tx_app.process_result(body)
 
     def prepare_message(self, body, priority=0,
                         content_type=None, content_encoding=None,

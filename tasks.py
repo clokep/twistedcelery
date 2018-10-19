@@ -16,5 +16,11 @@ def mul(a, b):
     return a * b
 
 
+@app.task
+def div(a, b):
+    print('Dividing {} / {} = {}'.format(a, b, a / b))
+    return a / b
+
+
 if __name__ == '__main__':
     app.worker_main()

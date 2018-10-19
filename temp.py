@@ -62,6 +62,8 @@ def main(reactor):
     # Create the Twisted Celery application.
     tx_app = txCelery(app)
 
+    # result = yield tx_app.send_task('tasks.div', args=(2, 0))
+
     # Send the message.
     print("Sending task(s)")
     result = tx_app.send_task('tasks.add', args=(2, 4))
@@ -72,10 +74,14 @@ def main(reactor):
 
     yield task.deferLater(reactor, 3, lambda: True)
 
-    result = yield tx_app.send_task('tasks.add', args=(2, 2))
+    result = yield tx_app.send_task('tasks.div', args=(2, 2))
     print("Got result: ", result)
+    result = yield tx_app.send_task('tasks.div', args=(2, 0))
 
     tx_app.disconnect()
 
+
+#result = app.send_task('tasks.div', args=(2, 0))
+#result.get()
 
 task.react(main)

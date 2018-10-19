@@ -2,7 +2,7 @@ from __future__ import absolute_import, print_function, unicode_literals
 
 import warnings
 
-from celery import signals
+from celery import signals, states
 from celery.exceptions import AlwaysEagerIgnored
 
 from kombu.common import Broadcast
@@ -109,17 +109,25 @@ class txCelery(object):
         result = yield result
         defer.returnValue(result)
 
-    def got_result(self, payload):
-        result = self.app.backend.decode(payload)
+    def process_result(self, payload):
+        meta = self.app.backend.decode_result(payload)
+
+        # TODO Handle things like started, etc. (E.g. task_track_started.)
+        if meta['status'] in states.UNREADY_STATES:
+            return
 
         # Try to find the Deferred to resolve.
         try:
-            d = self._sent_tasks[result['task_id']]
+            d = self._sent_tasks.pop(meta['task_id'])
         except KeyError:
             return
 
-        # TODO Handle failures.
-        d.callback(result['result'])
+        # Success states go to the callback, errors go to the errback.
+        if meta['status'] == states.SUCCESS:
+            d.callback(meta['result'])
+
+        else:
+            d.errback(meta['result'])
 
     def send_task_message(self, name, message,
                           exchange=None, routing_key=None, queue=None,
