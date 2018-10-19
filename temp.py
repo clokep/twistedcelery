@@ -57,24 +57,23 @@ observer.start()
 # END LOGGING
 
 
-def later():
-    print("LATER DUDE")
-
-
 @defer.inlineCallbacks
 def main(reactor):
     # Create the Twisted Celery application.
     tx_app = txCelery(app)
 
     # Send the message.
-    print("Sending task")
+    print("Sending task(s)")
     result = tx_app.send_task('tasks.add', args=(2, 4))
-    print("Result", result)
+    result2 = tx_app.send_task('tasks.add', args=(4, 4))
     result = yield result
-    print("Wait for result", result)
+    result2 = yield result2
+    print("Got results: ", result, result2)
 
-    # Wait a bit.
-    yield task.deferLater(reactor, 10, later)
+    yield task.deferLater(reactor, 3, lambda: True)
+
+    result = yield tx_app.send_task('tasks.add', args=(2, 2))
+    print("Got result: ", result)
 
     tx_app.disconnect()
 

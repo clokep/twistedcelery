@@ -16,51 +16,63 @@ class AmqpBackend(object):
         # The Celery app.
         self.app = tx_app.app
 
-        self._connected = False
+        self._connected = True
+        self._connecting = False
+        self._connection_deferred = defer.Deferred()
 
     @defer.inlineCallbacks
     def ensure_connected(self):
         """Ensure that the producer is connected (and the consumer is ready to receive results)."""
-        if not self._connected:
-            # Initialize pika.
-            parameters = pika.connection.URLParameters(self.app.conf.broker_url)
-            if parameters.virtual_host == '':
-                parameters.virtual_host = '/'
-            creator = ClientCreator(reactor, TwistedProtocolConnection, parameters)
+        if self._connecting:
+            yield self._connection_deferred
+            return
 
-            # Connect to the broker.
-            protocol = yield creator.connectTCP(parameters.host, parameters.port)
-            yield protocol.ready
+        self._connecting = True
+        self._connection_deferred = defer.Deferred()
 
-            # Ensure there's a channel open.
-            self.channel = yield protocol.channel(1)
+        # Initialize pika.
+        parameters = pika.connection.URLParameters(self.app.conf.broker_url)
+        if parameters.virtual_host == '':
+            parameters.virtual_host = '/'
+        creator = ClientCreator(reactor, TwistedProtocolConnection, parameters)
 
-            # Declare the result queue. See celery.backends.rpc.binding
-            yield self.channel.queue_declare(
-                queue=self.app.backend.binding.name,
-                durable=False,
-                exclusive=False,
-                auto_delete=True,
-                # Convert to milliseconds.
-                arguments={
-                    'x-expires': int(self.app.backend.binding.expires * 1000),
-                })
+        # Connect to the broker.
+        protocol = yield creator.connectTCP(parameters.host, parameters.port)
+        yield protocol.ready
 
-            # Note: It is illegal to declare exchanges or bindings on the
-            # default queue.
+        # Ensure there's a channel open.
+        self.channel = yield protocol.channel(1)
 
-            # Consume from the results queue. The consumer tag is used to match
-            # responses back up with the proper (in-memory) queue, we only have
-            # one consumer on a results queue, so just re-use the queue name.
-            queue, consumer_tag = yield self.channel.basic_consume(
-                queue=self.app.backend.binding.name,
-                no_ack=True,
-                consumer_tag=self.app.backend.binding.name)
+        # Declare the result queue. See celery.backends.rpc.binding
+        yield self.channel.queue_declare(
+            queue=self.app.backend.binding.name,
+            durable=False,
+            exclusive=False,
+            auto_delete=True,
+            # Convert to milliseconds.
+            arguments={
+                'x-expires': int(self.app.backend.binding.expires * 1000),
+            })
 
-            # TODO Continually read from this queue.
-            queue.get().addCallback(self.got_result)
+        # Note: It is illegal to declare exchanges or bindings on the
+        # default queue.
 
-            self._connected = True
+        # Consume from the results queue. The consumer tag is used to match
+        # responses back up with the proper (in-memory) queue, we only have
+        # one consumer on a results queue, so just re-use the queue name.
+        queue, consumer_tag = yield self.channel.basic_consume(
+            queue=self.app.backend.binding.name,
+            no_ack=True,
+            consumer_tag=self.app.backend.binding.name)
+
+        # Continually read from this queue.
+        def process_queue(result):
+            self.got_result(result)
+            queue.get().addCallback(process_queue)
+        queue.get().addCallback(process_queue)
+
+        self._connected = True
+        self._connection_deferred.callback(True)
 
     def got_result(self, message):
         channel, method, properties, body = message
