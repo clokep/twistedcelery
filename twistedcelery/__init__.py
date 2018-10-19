@@ -1,1 +1,1 @@
-from twistedcelery.app import txCelery
+from twistedcelery.app import TwistedCelery

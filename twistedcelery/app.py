@@ -15,10 +15,10 @@ from kombu.serialization import dumps
 
 from twisted.internet import defer
 
-from twistedcelery.amqp import AmqpBackend
+from twistedcelery.transports.amqp import AmqpBackend
 
 
-class txCelery(object):
+class TwistedCelery(object):
     def __init__(self, app):
         # The Celery app.
         self.app = app

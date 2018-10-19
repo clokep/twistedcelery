@@ -3,7 +3,7 @@ import sys
 
 from twisted.internet import defer, task
 
-from twistedcelery import txCelery
+from twistedcelery import TwistedCelery
 
 from tasks import app
 
@@ -60,7 +60,7 @@ observer.start()
 @defer.inlineCallbacks
 def main(reactor):
     # Create the Twisted Celery application.
-    tx_app = txCelery(app)
+    tx_app = TwistedCelery(app)
 
     # result = yield tx_app.send_task('tasks.div', args=(2, 0))
 
