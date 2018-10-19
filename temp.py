@@ -73,12 +73,6 @@ def main(reactor):
     result2 = yield result2
     print("Got results: ", result, result2)
 
-    yield task.deferLater(reactor, 3, lambda: True)
-
-    result = yield tx_app.send_task('tests.tasks.div', args=(2, 2))
-    print("Got result: ", result)
-    result = yield tx_app.send_task('tests.tasks.div', args=(2, 0))
-
     tx_app.disconnect()
 
 

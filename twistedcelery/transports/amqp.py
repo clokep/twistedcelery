@@ -16,7 +16,7 @@ class AmqpBackend(object):
         # The Celery app.
         self.app = tx_app.app
 
-        self._connected = True
+        self._protocol = None
         self._connecting = False
         self._connection_deferred = defer.Deferred()
 
@@ -37,14 +37,14 @@ class AmqpBackend(object):
         creator = ClientCreator(reactor, TwistedProtocolConnection, parameters)
 
         # Connect to the broker.
-        protocol = yield creator.connectTCP(parameters.host, parameters.port)
-        yield protocol.ready
+        self._protocol = yield creator.connectTCP(parameters.host, parameters.port)
+        yield self._protocol.ready
 
         # Ensure there's a channel open.
-        self.channel = yield protocol.channel(1)
+        self._channel = yield self._protocol.channel(1)
 
         # Declare the result queue. See celery.backends.rpc.binding
-        yield self.channel.queue_declare(
+        yield self._channel.queue_declare(
             queue=self.app.backend.binding.name,
             durable=False,
             exclusive=False,
@@ -60,7 +60,7 @@ class AmqpBackend(object):
         # Consume from the results queue. The consumer tag is used to match
         # responses back up with the proper (in-memory) queue, we only have
         # one consumer on a results queue, so just re-use the queue name.
-        queue, consumer_tag = yield self.channel.basic_consume(
+        queue, consumer_tag = yield self._channel.basic_consume(
             queue=self.app.backend.binding.name,
             no_ack=True,
             consumer_tag=self.app.backend.binding.name)
@@ -71,7 +71,6 @@ class AmqpBackend(object):
             queue.get().addCallback(process_queue)
         queue.get().addCallback(process_queue)
 
-        self._connected = True
         self._connection_deferred.callback(True)
 
     def process_result(self, message):
@@ -94,7 +93,7 @@ class AmqpBackend(object):
     def basic_publish(self, content, exchange, routing_key, mandatory, immediate):
         body, properties = content
         # Pass publishing to the underlying implementation.
-        return self.channel.basic_publish(
+        return self._channel.basic_publish(
             exchange=exchange,
             routing_key=routing_key,
             body=body,
@@ -103,7 +102,7 @@ class AmqpBackend(object):
             immediate=immediate)
 
     def disconnect(self):
-        if self._connected:
+        if self._protocol:
             # Disconnect politely.
-            #self.client.transport.loseConnection()
-            pass
+            self._channel.close()
+            self._protocol.transport.loseConnection()
