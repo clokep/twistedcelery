@@ -1,8 +1,20 @@
 *.pyc
 __pycache__
 
-# Testing
+# Build related.
+_build
+build
+dist
+celery_batches.egg-info
+
+# Testing related.
+.cache
 .pytest_cache
+.tox
+
+# Coverage related.
+.coverage
+htmlcov
 
 # Vagrant
 .vagrant
