@@ -1,11 +1,17 @@
 *.pyc
 __pycache__
 
-# Build related.
-_build
-build
+# Packages
+*.egg
+*.egg-info
 dist
-celery_batches.egg-info
+build
+eggs
+parts
+bin
+sdist
+develop-eggs
+.installed.cfg
 
 # Testing related.
 .cache
@@ -18,3 +24,6 @@ htmlcov
 
 # Vagrant
 .vagrant
+
+# Editor files
+.idea
