@@ -4,7 +4,7 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
 
   # Use less memory.
   config.vm.provider :virtualbox do |vb|
-    vb.customize ["modifyvm", :id, "--usb", "off", "--memory", "256"]
+    vb.customize ["modifyvm", :id, "--usb", "off", "--memory", "512"]
   end
 
   # Forward the RabbitMQ management port.
