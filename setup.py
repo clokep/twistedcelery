@@ -28,7 +28,7 @@ setuptools.setup(
         # Probably works with older versions.
         'twisted>=18.7.0',
         # Probably works with older versions.
-        'pika>=0.12.0',
+        'pika>=0.12.0<1.0.0',
     ],
     classifiers=[
         'Development Status :: 2 - Pre-Alpha',
